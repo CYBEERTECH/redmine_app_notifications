@@ -1,0 +1,181 @@
+<% content_for :header_tags do %>
+  <%= stylesheet_link_tag 'app_notifications', plugin: 'redmine_app_notifications' %>
+  <style>
+    .rfi-preference-item {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #f9f9f9;
+    }
+    .rfi-preference-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .rfi-preference-controls select, .rfi-preference-controls input {
+      padding: 5px;
+    }
+    .remove-preference {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .add-preference {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-bottom: 15px;
+    }
+  </style>
+<% end %>
+
+<h2>RFI Notification Preferences</h2>
+
+<p>As a Team Lead, you can choose which RFI requests you want to be notified about. If no preferences are set, you'll receive notifications for all RFIs.</p>
+
+<%= form_with url: update_rfi_preferences_app_notifications_path, method: :patch, local: true do |form| %>
+  <div id="rfi-preferences-container">
+    <% current_prefs = User.current.rfi_notification_preferences %>
+    <% if current_prefs.any? %>
+      <% current_prefs.each_with_index do |pref, index| %>
+        <div class="rfi-preference-item" data-index="<%= index %>">
+          <div class="rfi-preference-controls">
+            <label>Notify me for RFIs in:</label>
+            <select name="preferences[<%= index %>][type]" class="preference-type">
+              <option value="project" <%= 'selected' if pref['type'] == 'project' %>>Project</option>
+              <option value="priority" <%= 'selected' if pref['type'] == 'priority' %>>Priority</option>
+              <option value="category" <%= 'selected' if pref['type'] == 'category' %>>Category</option>
+              <option value="tracker" <%= 'selected' if pref['type'] == 'tracker' %>>Tracker</option>
+            </select>
+            
+            <select name="preferences[<%= index %>][value]" class="preference-value">
+              <% case pref['type']
+                 when 'project' %>
+                <% Project.active.each do |project| %>
+                  <option value="<%= project.id %>" <%= 'selected' if pref['value'] == project.id.to_s %>><%= project.name %></option>
+                <% end %>
+              <% when 'priority' %>
+                <% IssuePriority.active.each do |priority| %>
+                  <option value="<%= priority.name %>" <%= 'selected' if pref['value'] == priority.name %>><%= priority.name %></option>
+                <% end %>
+              <% when 'category' %>
+                <% IssueCategory.all.each do |category| %>
+                  <option value="<%= category.name %>" <%= 'selected' if pref['value'] == category.name %>><%= category.name %></option>
+                <% end %>
+              <% when 'tracker' %>
+                <% Tracker.all.each do |tracker| %>
+                  <option value="<%= tracker.name %>" <%= 'selected' if pref['value'] == tracker.name %>><%= tracker.name %></option>
+                <% end %>
+              <% end %>
+            </select>
+            
+            <button type="button" class="remove-preference" onclick="removePreference(this)">Remove</button>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <p><em>No preferences set. You will receive notifications for all RFIs.</em></p>
+    <% end %>
+  </div>
+  
+  <button type="button" class="add-preference" onclick="addPreference()">Add RFI Preference</button>
+  
+  <div style="margin-top: 20px;">
+    <%= form.submit "Save Preferences", class: "btn btn-primary" %>
+    <%= link_to "Cancel", app_notifications_path, class: "btn" %>
+  </div>
+<% end %>
+
+<script>
+let preferenceIndex = <%= current_prefs.size %>;
+
+function addPreference() {
+  const container = document.getElementById('rfi-preferences-container');
+  const noPrefsMsg = container.querySelector('p em');
+  if (noPrefsMsg) noPrefsMsg.remove();
+  
+  const newPreference = document.createElement('div');
+  newPreference.className = 'rfi-preference-item';
+  newPreference.setAttribute('data-index', preferenceIndex);
+  
+  newPreference.innerHTML = `
+    <div class="rfi-preference-controls">
+      <label>Notify me for RFIs in:</label>
+      <select name="preferences[${preferenceIndex}][type]" class="preference-type" onchange="updateValueOptions(this)">
+        <option value="project">Project</option>
+        <option value="priority">Priority</option>
+        <option value="category">Category</option>
+        <option value="tracker">Tracker</option>
+      </select>
+      
+      <select name="preferences[${preferenceIndex}][value]" class="preference-value">
+        <% Project.active.each do |project| %>
+          <option value="<%= project.id %>"><%= project.name %></option>
+        <% end %>
+      </select>
+      
+      <button type="button" class="remove-preference" onclick="removePreference(this)">Remove</button>
+    </div>
+  `;
+  
+  container.appendChild(newPreference);
+  preferenceIndex++;
+}
+
+function removePreference(button) {
+  const item = button.closest('.rfi-preference-item');
+  item.remove();
+  
+  const container = document.getElementById('rfi-preferences-container');
+  if (container.children.length === 0) {
+    container.innerHTML = '<p><em>No preferences set. You will receive notifications for all RFIs.</em></p>';
+  }
+}
+
+function updateValueOptions(typeSelect) {
+  const valueSelect = typeSelect.parentNode.querySelector('.preference-value');
+  const type = typeSelect.value;
+  
+  let options = '';
+  switch(type) {
+    case 'project':
+      <% Project.active.each do |project| %>
+        options += '<option value="<%= project.id %>"><%= project.name %></option>';
+      <% end %>
+      break;
+    case 'priority':
+      <% IssuePriority.active.each do |priority| %>
+        options += '<option value="<%= priority.name %>"><%= priority.name %></option>';
+      <% end %>
+      break;
+    case 'category':
+      <% IssueCategory.all.each do |category| %>
+        options += '<option value="<%= category.name %>"><%= category.name %></option>';
+      <% end %>
+      break;
+    case 'tracker':
+      <% Tracker.all.each do |tracker| %>
+        options += '<option value="<%= tracker.name %>"><%= tracker.name %></option>';
+      <% end %>
+      break;
+  }
+  valueSelect.innerHTML = options;
+}
+
+// Initialize existing preference dropdowns
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.preference-type').forEach(function(select) {
+    select.addEventListener('change', function() {
+      updateValueOptions(this);
+    });
+  });
+});
+</script>

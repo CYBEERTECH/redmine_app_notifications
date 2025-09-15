@@ -1,0 +1,12 @@
+$(document).ready(function() {
+  // Handle mark as read via AJAX
+  $('.notification-actions a[data-method="patch"]').on('ajax:success', function() {
+    $(this).closest('.app-notification').removeClass('unread');
+    $(this).remove();
+  });
+
+  // Handle delete via AJAX
+  $('.notification-actions a[data-method="delete"]').on('ajax:success', function() {
+    $(this).closest('.app-notification').fadeOut();
+  });
+});

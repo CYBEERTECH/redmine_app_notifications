@@ -1,0 +1,116 @@
+class AppNotification < ActiveRecord::Base
+  before_validation { self.recipient_id ||= self.user_id }
+  scope :for_user, ->(user) { where("user_id = :id OR recipient_id = :id", id: user.id) }
+
+  belongs_to :user
+  belongs_to :issue, :optional => true
+  belongs_to :journal, :optional => true
+  belongs_to :news, :optional => true
+
+  validates :user_id, :presence => true
+  validates :title, :presence => true, :length => { :maximum => 255 }
+  validates :message, :presence => true
+  validates :url, :length => { :maximum => 500 }
+
+  scope :unread, -> { where(:read => false) }
+  scope :recent, -> { order(:created_at => :desc) }
+
+  def self.allowed_recipient?(user, project)
+    allowed_roles  = ["Crew Lead", "Mission Element Lead", "Team Lead"]
+    allowed_groups = ["Operations", "Supervisors"]
+    user_roles  = user.roles_for_project(project).map(&:name)
+    group_names = user.groups.map(&:name)
+    (user_roles & allowed_roles).any? || (group_names & allowed_groups).any?
+  end
+
+  def read?
+    read == true
+  end
+
+  def mark_as_read!
+    update_attribute(:read, true)
+  end
+
+def self.create_for_issue(issue, user, action)
+    return unless user && issue && allowed_recipient?(user, issue.project)
+    
+    Rails.logger.info "[AppNotifications] Creating notification for issue ##{issue.id}, user: #{user.name}, action: #{action}"
+    
+    title = case action
+            when 'created'
+              "Case ##{issue.id} created"
+            when 'updated'
+              "Case ##{issue.id} assigned to you"
+            else
+              "Case ##{issue.id} changed"
+            end
+    message = "#{issue.subject}"
+    url = Rails.application.routes.url_helpers.issue_path(issue)
+    
+
+begin
+      notification = create!(
+        :user => user,
+        :issue => issue,
+        :journal => nil,
+        :title => title,
+        :message => message,
+        :url => url,
+        :read => false
+      )
+
+      Rails.logger.info "[AppNotifications] Successfully created notification ID: #{notification.id}"
+      notification
+    rescue => e
+      Rails.logger.error "[AppNotifications] Failed to create notification: #{e.message}"
+      nil
+    end
+  end
+
+def self.create_for_journal(journal, user)
+    return unless user && journal && journal.issue && allowed_recipient?(user, journal.issue.project)
+    
+    Rails.logger.info "[AppNotifications] Creating notification for journal ##{journal.id}, user: #{user.name}"
+    
+    # Build change description
+    changes = []
+    journal.details.each do |detail|
+      case detail.prop_key
+      when 'status_id'
+        old_status = IssueStatus.find_by(id: detail.old_value)&.name || 'Unknown'
+        new_status = IssueStatus.find_by(id: detail.value)&.name || 'Unknown'
+        changes << "Status changed from #{old_status} to #{new_status}"
+      when 'assigned_to_id'
+        old_user = User.find_by(id: detail.old_value)&.name || 'Unassigned'
+        new_user = User.find_by(id: detail.value)&.name || 'Unassigned'
+        changes << "Assignee changed from #{old_user} to #{new_user}"
+      end
+    end
+    
+    title = "Case ##{journal.issue.id} updated"
+    message = if changes.any?
+                changes.join('; ')
+              elsif journal.notes.present?
+                journal.notes.truncate(200)
+              else
+                "Case updated"
+              end
+    url = Rails.application.routes.url_helpers.issue_path(journal.issue)
+    
+    begin
+      notification = create!(
+        :user => user,
+        :issue => issue,
+        :journal => nil,
+        :title => title,
+        :message => message,
+        :read => false
+      )
+      Rails.logger.info "[AppNotifications] Successfully created notification ID: #{notification.id}"
+      notification
+    rescue => e
+      Rails.logger.error "[AppNotifications] Failed to create notification: #{e.message}"
+      nil
+    end
+  end
+end

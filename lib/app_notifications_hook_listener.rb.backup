@@ -1,0 +1,75 @@
+class AppNotificationsHookListener < Redmine::Hook::Listener
+
+  # Fires after a new issue is created
+  def controller_issues_new_after_save(context = {})
+    issue = context[:issue]
+    return unless issue
+
+    return unless Setting.plugin_redmine_app_notifications['enable_notifications'] == '1'
+
+    allowed_roles  = ["Crew Lead", "Mission Element Lead", "Team Lead"]
+    allowed_groups = ["Operations", "Supervisors"]
+
+    recipients = []
+
+    # Assigned user
+    if issue.assigned_to.is_a?(User)
+      recipients << issue.assigned_to
+    end
+
+    # Roles
+    recipients |= issue.project.users.select do |u|
+      (u.roles_for_project(issue.project).map(&:name) & allowed_roles).any?
+    end
+
+    # Groups
+    recipients |= issue.project.users.select do |u|
+      (u.groups.map(&:name) & allowed_groups).any?
+    end
+
+    recipients = recipients.uniq - [User.current]
+
+    Rails.logger.info "[AppNotifications] Hook: Issue created ##{issue.id} -> #{recipients.map(&:name).join(', ')}"
+
+    recipients.each do |u|
+      AppNotification.create_for_issue(issue, u, 'created')  # ✅ fixed arity (3 args)
+    end
+  end
+
+  # Fires after an issue is updated (status, notes, assignment, etc.)
+  def controller_issues_edit_after_save(context = {})
+    issue   = context[:issue]
+    journal = context[:journal]
+    return unless issue && journal
+
+    return unless Setting.plugin_redmine_app_notifications['enable_notifications'] == '1'
+
+    has_field_changes = journal.details.any?
+    has_notes         = journal.notes.present?
+    return unless has_field_changes || has_notes
+
+    allowed_roles  = ["Crew Lead", "Mission Element Lead", "Team Lead"]
+    allowed_groups = ["Operations", "Supervisors"]
+
+    recipients = []
+
+    if issue.assigned_to.is_a?(User)
+      recipients << issue.assigned_to
+    end
+
+    User.active.includes(:memberships => :roles).each do |u|
+      user_roles = u.roles_for_project(issue.project).map(&:name)
+      if (user_roles & allowed_roles).any? || (u.groups.map(&:name) & allowed_groups).any?
+        recipients << u
+      end
+    end
+
+    recipients = recipients.uniq.reject { |u| u == User.current }
+
+    Rails.logger.info "[AppNotifications] Hook: Issue updated ##{issue.id}, journal ##{journal.id} -> #{recipients.map(&:name).join(', ')}"
+
+    recipients.each do |u|
+      AppNotification.create_for_journal(issue, journal, u)
+    end
+  end
+end

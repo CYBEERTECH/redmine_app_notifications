@@ -1,0 +1,21 @@
+<p>
+  <label>
+    <%= check_box_tag 'settings[enable_notifications]', '1', @settings['enable_notifications'] == '1' %>
+    <%= l(:setting_enable_notifications) %>
+  </label>
+</p>
+
+<p>
+  <label>
+    <%= check_box_tag 'settings[notification_sound]', '1', @settings['notification_sound'] == '1' %>
+    <%= l(:setting_notification_sound) %>
+  </label>
+</p>
+
+<p>
+  <label>
+    <%= l(:setting_auto_refresh) %>:
+    <%= text_field_tag 'settings[auto_refresh]', @settings['auto_refresh'], :size => 6 %>
+    <%= l(:label_second_plural) %>
+  </label>
+</p>

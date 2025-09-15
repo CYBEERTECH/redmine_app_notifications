@@ -1,0 +1,97 @@
+<% content_for :header_tags do %>
+  <%= stylesheet_link_tag 'app_notifications', plugin: 'redmine_app_notifications' %>
+  <%= javascript_include_tag 'app_notifications', plugin: 'redmine_app_notifications' %>
+  <script>
+    document.addEventListener("ajax:success", function(event) {
+      const el = event.target.closest(".app-notification");
+      if (el) el.remove();
+    });
+  </script>
+<% end %>
+
+<div class="contextual">
+  <% if @notifications.any? { |n| !n.read? } %>
+    <%= link_to l(:button_mark_all_as_read),
+                mark_all_as_read_app_notifications_path,
+                method: :patch,
+                remote: true,
+                class: 'icon icon-checked' %>
+  <% else %>
+    <%= link_to l(:button_mark_all_as_unread),
+                mark_all_as_unread_app_notifications_path,
+                method: :patch,
+                remote: true,
+                class: 'icon icon-unchecked' %>
+  <% end %>
+    <%= link_to 'Delete all',
+                delete_all_app_notifications_path,
+                method: :delete,
+                remote: true,
+                class: 'icon icon-del',
+                data: { confirm: l(:text_are_you_sure) } %>
+
+
+
+</div>
+
+<h2 style="display:flex; align-items:center;">
+  <%= l(:label_app_notifications) %>
+  <% if @notifications.any? { |n| !n.read? } %>
+    <span style="margin-left:0.5em;">🔔</span>
+  <% end %>
+</h2>
+
+<% if @notifications.any? %>
+  <div id="app-notifications-list">
+    <% @notifications.select { |n| n.title.start_with?('Case') }.each do |notification| %>
+      <div class="app-notification <%= 'unread' unless notification.read? %>" data-id="<%= notification.id %>">
+        <div class="notification-content">
+          <h4>
+<% if notification.url =~ /\/issues\/(\d+)/ %>
+  <% issue_id = $1.to_i
+     issue    = Issue.find_by(id: issue_id) %>
+  <h4>
+    <%= link_to(
+         issue ? "Case ##{issue.id} #{issue.subject} updated"
+               : notification.title,
+         notification.url.presence || notification_url(notification)
+       ) %>
+  </h4>
+<% else %>
+  <h4>
+    <%= link_to notification.title,
+                notification.url.presence || notification_url(notification) %>
+  </h4>
+<% end %>
+          </h4>
+          <p><%= notification.message.html_safe %></p>
+            <span class="notification-time" data-timestamp="<%= notification.created_at.iso8601 %>"></span>
+
+        </div>
+        <div class="notification-meta">
+          <div class="notification-actions">
+            <% if notification.read? %>
+              <%= link_to 'Mark as unread',
+                          mark_as_unread_app_notification_path(notification, format: :json),
+                          method: :patch, remote: true,
+                          class: 'icon icon-checked' %>
+
+            <% else %>
+              <%= link_to 'Mark as read',
+                          mark_as_read_app_notification_path(notification, format: :json),
+                          method: :patch, remote: true,
+                          class: 'icon icon-unchecked' %>
+            <% end %>
+            <%= link_to l(:button_delete),
+                        app_notification_path(notification, format: :json),
+                        method: :delete, remote: true,
+                        class: 'icon icon-del',
+                        data: { confirm: l(:text_are_you_sure) } %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <p class="nodata"><%= l(:label_no_notifications) %></p>
+<% end %>

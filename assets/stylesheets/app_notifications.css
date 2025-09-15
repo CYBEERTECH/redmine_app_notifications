@@ -1,0 +1,93 @@
+.app-notification {
+  border: 1px solid #ddd;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.app-notification.unread {
+  background-color: #f0f8ff;
+  border-left: 4px solid #007cba;
+}
+
+.notification-icon {
+  margin-right: 10px;
+  padding-top: 2px;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-content h4 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+}
+
+.notification-content p {
+  margin: 0 0 10px 0;
+  color: #666;
+}
+
+.notification-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #999;
+}
+
+.notification-actions a {
+  margin-left: 10px;
+}
+
+/* Bell icon styles */
+.notifications-bell {
+  position: relative;
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notifications-bell:hover {
+  text-decoration: none !important;
+}
+
+.notifications-bell.active {
+  animation: bellRing 2s ease-in-out;
+}
+
+.notification-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 16px;
+  text-align: center;
+}
+
+@keyframes bellRing {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg); }
+  20%, 40%, 60%, 80% { transform: rotate(10deg); }
+}
+
+.notifications-wrapper {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.notification-time {
+  font-size: 11px;
+  color: #999;
+  font-style: italic;
+  display: block;
+  margin-top: 5px;
+}
